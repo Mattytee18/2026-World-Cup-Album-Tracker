@@ -11,7 +11,12 @@ function createWindow() {
       contextIsolation: true
     }
   })
-  win.loadFile(path.join(__dirname, 'dist', 'index.html'))
+
+  // Load the index.html from the dist folder
+  win.loadURL(`file://${path.join(__dirname, 'dist', 'index.html')}`)
+
+  // Uncomment to open DevTools for debugging
+  // win.webContents.openDevTools()
 }
 
 app.whenReady().then(createWindow)
