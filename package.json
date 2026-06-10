@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Panini FIFA World Cup 2026 Sticker Tracker",
   "author": "Mattytee18",
-  "main": "electron/main.js",
+  "main": "main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -15,9 +15,10 @@
     "productName": "Panini WC2026 Tracker",
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "main.js",
+      "electron/icon.ico",
+      "electron/icon.png"
     ],
-    "extraResources": [],
     "directories": {
       "output": "release"
     },
