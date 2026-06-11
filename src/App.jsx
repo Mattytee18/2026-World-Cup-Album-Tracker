@@ -525,6 +525,151 @@ export default function App() {
 
   const isSearching = search.trim().length > 0;
 
+  // ── Check List View ────────────────────────────────────────────────────────
+  const CheckListView = () => {
+    const [input, setInput] = useState("");
+    const [results, setResults] = useState(null);
+    const imgRef = useRef(null);
+
+    // Build a lookup of all sticker labels
+    const allStickers = useMemo(() => {
+      const map = {};
+      ALL_TEAMS.forEach(team => {
+        buildStickers(team).forEach((s, i) => {
+          map[s.label.toUpperCase()] = { code: team.code, teamName: team.name, idx: i, label: s.label };
+        });
+      });
+      FWC_STICKERS.forEach((s, i) => { map[s.label.toUpperCase()] = { code: "FWC", teamName: "FWC Stickers", idx: i, label: s.label, isFWC: true }; });
+      CC_STICKERS.forEach((s, i)  => { map[s.label.toUpperCase()] = { code: "CC",  teamName: "CC Stickers",  idx: i, label: s.label, isCC:  true }; });
+      return map;
+    }, []);
+
+    function parseAndCheck(text) {
+      // Extract all sticker-like codes from the text
+      const matches = text.toUpperCase().match(/[A-Z]{2,4}\d{1,2}/g) || [];
+      const need = [], dontNeed = [], notFound = [];
+      const seen = new Set();
+      matches.forEach(code => {
+        if (seen.has(code)) return;
+        seen.add(code);
+        const sticker = allStickers[code];
+        if (!sticker) { notFound.push(code); return; }
+        const isOwned = sticker.isFWC
+          ? fwcOwned[sticker.idx]
+          : sticker.isCC
+            ? ccOwned[sticker.idx]
+            : owned[sticker.code]?.[sticker.idx];
+        if (!isOwned) need.push(sticker);
+        else dontNeed.push(sticker);
+      });
+      setResults({ need, dontNeed, notFound, total: seen.size });
+    }
+
+    function handleCheck() {
+      if (input.trim()) parseAndCheck(input);
+    }
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 16px" }}>
+          <div style={{ fontFamily: "Bebas Neue, sans-serif", fontSize: 18, color: T.gold, letterSpacing: "0.08em", marginBottom: 6 }}>CHECK A STICKER LIST</div>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>
+            Paste a list of sticker codes (e.g. from a friend's duplicates) and see which ones you still need.
+          </div>
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            placeholder="Paste sticker codes here e.g. MEX1, MEX5, BRA3, FWC1, CC2..."
+            style={{
+              width: "100%", height: 120, fontSize: 12, fontFamily: "monospace",
+              padding: 10, borderRadius: 6, border: `1px solid ${T.border}`,
+              background: T.navy, color: T.white, resize: "vertical", outline: "none",
+              marginBottom: 10,
+            }}
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleCheck} style={{
+              flex: 1, padding: "10px", fontSize: 13, fontWeight: 700, borderRadius: 6, cursor: "pointer",
+              border: "none", background: T.gold, color: T.navy, letterSpacing: "0.04em",
+            }}>🔍 CHECK LIST</button>
+            <button onClick={() => { setInput(""); setResults(null); }} style={{
+              padding: "10px 16px", fontSize: 12, borderRadius: 6, cursor: "pointer",
+              border: `1px solid ${T.border}`, background: T.navyLight, color: T.muted,
+            }}>Clear</button>
+          </div>
+        </div>
+
+        {results && (
+          <>
+            {/* Summary */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {[
+                { label: "You Need", value: results.need.length, color: T.red },
+                { label: "Already Have", value: results.dontNeed.length, color: T.green },
+                { label: "Not Found", value: results.notFound.length, color: T.muted },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: T.card, borderRadius: 10, padding: "10px 12px", border: `1px solid ${T.border}`, borderTop: `3px solid ${color}` }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: T.muted, marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "Bebas Neue, sans-serif", color: T.white }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Stickers you need */}
+            {results.need.length > 0 && (
+              <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#FF6680", marginBottom: 10 }}>✗ You need these ({results.need.length})</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {results.need.map(({ label, teamName, isFWC, isCC }) => (
+                    <div key={label} style={{ padding: "4px 10px", borderRadius: 5, background: "rgba(200,16,46,0.15)", border: "1px solid #8B1020" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#FF6680" }}>{label}</div>
+                      <div style={{ fontSize: 9, color: T.muted }}>{teamName}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Stickers you already have */}
+            {results.dontNeed.length > 0 && (
+              <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.green, marginBottom: 10 }}>✓ You already have these ({results.dontNeed.length})</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {results.dontNeed.map(({ label, teamName }) => (
+                    <div key={label} style={{ padding: "4px 10px", borderRadius: 5, background: "rgba(0,193,138,0.12)", border: `1px solid ${T.greenDim}` }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: T.green }}>{label}</div>
+                      <div style={{ fontSize: 9, color: T.muted }}>{teamName}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Not recognized */}
+            {results.notFound.length > 0 && (
+              <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.muted, marginBottom: 10 }}>? Not recognized ({results.notFound.length})</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {results.notFound.map(label => (
+                    <div key={label} style={{ padding: "4px 10px", borderRadius: 5, background: T.navyLight, border: `1px solid ${T.border}` }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: T.muted }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {results.need.length === 0 && results.dontNeed.length > 0 && (
+              <div style={{ textAlign: "center", padding: "1rem", fontSize: 13, color: T.green, fontWeight: 600 }}>
+                🎉 You already have all of these stickers!
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <style>{css}</style>
@@ -604,11 +749,12 @@ export default function App() {
           <>
             <div style={{ display:"flex",flexWrap:"wrap",gap:6,marginBottom:12 }}>
               {[
-                { key:"special", label:"FWC & CC" },
-                { key:"group",   label:"By Group" },
-                { key:"team",    label:"By Team" },
-                { key:"missing", label:`Missing${TOTAL_STICKERS-totalOwned>0?` (${TOTAL_STICKERS-totalOwned})`:""}` },
-                { key:"dupes",   label:`Dupes${totalDupes>0?` (${totalDupes})`:""}` },
+                { key:"special",   label:"FWC & CC" },
+                { key:"group",     label:"By Group" },
+                { key:"team",      label:"By Team" },
+                { key:"missing",   label:`Missing${TOTAL_STICKERS-totalOwned>0?` (${TOTAL_STICKERS-totalOwned})`:""}` },
+                { key:"dupes",     label:`Dupes${totalDupes>0?` (${totalDupes})`:""}` },
+                { key:"checklist", label:"📋 Check List" },
               ].map(({key,label})=>(
                 <TabBtn key={key} active={view===key} onClick={()=>{setView(key);setOpenTeam(null);}}>{label}</TabBtn>
               ))}
@@ -675,6 +821,7 @@ export default function App() {
 
             {view==="missing" && <MissingView />}
             {view==="dupes"   && <DupesView />}
+            {view==="checklist" && <CheckListView />}
           </>
         )}
 
