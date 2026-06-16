@@ -105,7 +105,7 @@ const FWC_STICKERS = [
   { key: "FWC00", label: "FWC00" },
   ...Array.from({ length: 19 }, (_, i) => ({ key: `FWC${i+1}`, label: `FWC${i+1}` })),
 ];
-const CC_STICKERS = Array.from({ length: 14 }, (_, i) => ({ key: `CC${i+1}`, label: `CC${i+1}` }));
+const CC_STICKERS = Array.from({ length: 12 }, (_, i) => ({ key: `CC${i+1}`, label: `CC${i+1}` }));
 
 function buildStickers({ code, total }) {
   return Array.from({ length: total }, (_, i) => ({ key: `${code}_${i}`, label: `${code}${i+1}` }));
@@ -114,7 +114,7 @@ function buildStickers({ code, total }) {
 const ALL_TEAMS = Object.values(GROUPS).flat();
 const TEAM_TO_GROUP = {};
 Object.entries(GROUPS).forEach(([g, teams]) => teams.forEach(t => { TEAM_TO_GROUP[t.code] = g; }));
-const TOTAL_STICKERS = 980 + 20 + 14; // 1014
+const TOTAL_STICKERS = 980 + 20 + 12; // 1012
 
 const FLAG_URLS = {
   MEX:"mx",RSA:"za",KOR:"kr",CZE:"cz",CAN:"ca",BIH:"ba",QAT:"qa",SUI:"ch",
