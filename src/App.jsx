@@ -605,7 +605,6 @@ export default function App() {
     }, []);
 
     function parseAndCheck(text) {
-      // Extract all sticker-like codes from the text
       const matches = text.toUpperCase().match(/[A-Z]{2,4}\d{1,2}/g) || [];
       const need = [], dontNeed = [], notFound = [];
       const seen = new Set();
@@ -619,8 +618,13 @@ export default function App() {
           : sticker.isCC
             ? ccOwned[sticker.idx]
             : owned[sticker.code]?.[sticker.idx];
-        if (!isOwned) need.push(sticker);
-        else dontNeed.push(sticker);
+        const dupeCount = sticker.isFWC
+          ? fwcDupes[sticker.idx] || 0
+          : sticker.isCC
+            ? ccDupes[sticker.idx] || 0
+            : dupes[sticker.code]?.[sticker.idx] || 0;
+        if (!isOwned) need.push({ ...sticker, dupeCount: 0 });
+        else dontNeed.push({ ...sticker, dupeCount });
       });
       setResults({ need, dontNeed, notFound, total: seen.size });
     }
@@ -695,13 +699,28 @@ export default function App() {
               <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px" }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: T.green, marginBottom: 10 }}>✓ You already have these ({results.dontNeed.length})</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                  {results.dontNeed.map(({ label, teamName }) => (
-                    <div key={label} style={{ padding: "4px 10px", borderRadius: 5, background: "rgba(0,193,138,0.12)", border: `1px solid ${T.greenDim}` }}>
+                  {results.dontNeed.map(({ label, teamName, dupeCount }) => (
+                    <div key={label} style={{ padding: "4px 10px", borderRadius: 5, background: "rgba(0,193,138,0.12)", border: `1px solid ${T.greenDim}`, position: "relative" }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: T.green }}>{label}</div>
                       <div style={{ fontSize: 9, color: T.muted }}>{teamName}</div>
+                      {dupeCount > 0 && (
+                        <div style={{
+                          position: "absolute", top: -6, right: -6,
+                          background: T.gold, color: T.navy,
+                          fontSize: 9, fontWeight: 700,
+                          borderRadius: 999, minWidth: 16, height: 16,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          padding: "0 4px",
+                        }}>×{dupeCount}</div>
+                      )}
                     </div>
                   ))}
                 </div>
+                {results.dontNeed.some(s => s.dupeCount > 0) && (
+                  <div style={{ fontSize: 11, color: T.gold, marginTop: 10, fontWeight: 600 }}>
+                    🌟 Gold badge = you have duplicates of that sticker you could trade!
+                  </div>
+                )}
               </div>
             )}
 
