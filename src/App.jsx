@@ -697,7 +697,28 @@ export default function App() {
             {/* Stickers you already have */}
             {results.dontNeed.length > 0 && (
               <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: T.green, marginBottom: 10 }}>✓ You already have these ({results.dontNeed.length})</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: T.green }}>✓ You already have these ({results.dontNeed.length})</div>
+                  {results.dontNeed.some(s => s.dupeCount > 0) && (
+                    <CopyButton
+                      label="📋 Copy tradeable"
+                      getText={() => {
+                        const tradeable = results.dontNeed.filter(s => s.dupeCount > 0);
+                        const lines = ["TRADEABLE DUPLICATES FROM CHECKLIST", ""];
+                        const byTeam = {};
+                        tradeable.forEach(s => {
+                          if (!byTeam[s.teamName]) byTeam[s.teamName] = [];
+                          byTeam[s.teamName].push(`${s.label} ×${s.dupeCount}`);
+                        });
+                        Object.entries(byTeam).forEach(([team, items]) => {
+                          lines.push(`${team}: ${items.join(", ")}`);
+                        });
+                        lines.push("", `Total tradeable: ${tradeable.length}`);
+                        return lines.join("\n");
+                      }}
+                    />
+                  )}
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                   {results.dontNeed.map(({ label, teamName, dupeCount }) => (
                     <div key={label} style={{ padding: "4px 10px", borderRadius: 5, background: "rgba(0,193,138,0.12)", border: `1px solid ${T.greenDim}`, position: "relative" }}>
