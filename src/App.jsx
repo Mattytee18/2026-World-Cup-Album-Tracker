@@ -342,15 +342,31 @@ export default function App() {
             const isOwned = owned[code]?.[i], dupeCount = dupes[code]?.[i]||0;
             return (
               <div key={sticker.key}>
-                <button onClick={() => toggleOwned(code, i)} style={{
-                  width: "100%", aspectRatio: "3/4", borderRadius: 6, cursor: "pointer", padding: 0,
-                  border: isOwned ? `2px solid ${T.green}` : `1px solid ${T.border}`,
-                  background: isOwned ? "rgba(0,193,138,0.15)" : T.navy,
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: isOwned ? T.green : T.muted }}>{sticker.label}</span>
-                  {isOwned && <span style={{ fontSize: 11, color: T.green, marginTop: 1 }}>✓</span>}
-                </button>
+                <div style={{ position: "relative" }}>
+                  <button onClick={() => { if (!isOwned) toggleOwned(code, i); }} style={{
+                    width: "100%", aspectRatio: "3/4", borderRadius: 6, cursor: isOwned ? "default" : "pointer", padding: 0,
+                    border: isOwned ? `2px solid ${T.green}` : `1px solid ${T.border}`,
+                    background: isOwned ? "rgba(0,193,138,0.15)" : T.navy,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: isOwned ? T.green : T.muted }}>{sticker.label}</span>
+                    {isOwned && <span style={{ fontSize: 11, color: T.green, marginTop: 1 }}>✓</span>}
+                  </button>
+                  {isOwned && (
+                    <button
+                      onClick={() => toggleOwned(code, i)}
+                      title="Click to unmark"
+                      style={{
+                        position: "absolute", top: 2, right: 2,
+                        width: 14, height: 14, borderRadius: "50%",
+                        background: "rgba(200,16,46,0.7)", border: "none",
+                        cursor: "pointer", fontSize: 9, color: T.white,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        padding: 0, lineHeight: 1,
+                      }}
+                    >✕</button>
+                  )}
+                </div>
                 {isOwned && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, marginTop: 3 }}>
                     <button onClick={() => changeDupe(code, i, -1)} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>−</button>
@@ -392,19 +408,39 @@ export default function App() {
             const isOwned = ownedArr[i], dupeCount = dupesArr[i]||0;
             return (
               <div key={sticker.key}>
-                <button onClick={() => {
-                  const arr = [...ownedArr]; arr[i] = !arr[i];
-                  if (!arr[i]) { const da=[...dupesArr]; da[i]=0; setDupesArr(da); }
-                  setOwnedArr(arr);
-                }} style={{
-                  width: "100%", aspectRatio: "3/4", borderRadius: 6, cursor: "pointer", padding: 0,
-                  border: isOwned ? `2px solid ${color}` : `1px solid ${T.border}`,
-                  background: isOwned ? `${color}22` : T.navy,
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: isOwned ? color : T.muted }}>{sticker.label}</span>
-                  {isOwned && <span style={{ fontSize: 11, color, marginTop: 1 }}>✓</span>}
-                </button>
+                <div style={{ position: "relative" }}>
+                  <button onClick={() => {
+                    if (!isOwned) {
+                      const arr = [...ownedArr]; arr[i] = true; setOwnedArr(arr);
+                    }
+                  }} style={{
+                    width: "100%", aspectRatio: "3/4", borderRadius: 6, cursor: isOwned ? "default" : "pointer", padding: 0,
+                    border: isOwned ? `2px solid ${color}` : `1px solid ${T.border}`,
+                    background: isOwned ? `${color}22` : T.navy,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: isOwned ? color : T.muted }}>{sticker.label}</span>
+                    {isOwned && <span style={{ fontSize: 11, color, marginTop: 1 }}>✓</span>}
+                  </button>
+                  {isOwned && (
+                    <button
+                      onClick={() => {
+                        const arr = [...ownedArr]; arr[i] = false;
+                        const da = [...dupesArr]; da[i] = 0;
+                        setOwnedArr(arr); setDupesArr(da);
+                      }}
+                      title="Click to unmark"
+                      style={{
+                        position: "absolute", top: 2, right: 2,
+                        width: 14, height: 14, borderRadius: "50%",
+                        background: "rgba(200,16,46,0.7)", border: "none",
+                        cursor: "pointer", fontSize: 9, color: T.white,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        padding: 0, lineHeight: 1,
+                      }}
+                    >✕</button>
+                  )}
+                </div>
                 {isOwned && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, marginTop: 3 }}>
                     <button onClick={() => { const da=[...dupesArr]; da[i]=Math.max(0,(da[i]||0)-1); setDupesArr(da); }} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>−</button>
