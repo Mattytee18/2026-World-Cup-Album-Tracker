@@ -193,6 +193,14 @@ export default function App() {
   const importRef = useRef(null);
   const [importMsg, setImportMsg] = useState(null);
   const firstRender = useRef(true);
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+
+  function showToast(message, type = "success") {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
+  }
 
   useEffect(() => {
     if (firstRender.current) { firstRender.current = false; return; }
@@ -247,15 +255,29 @@ export default function App() {
     return list;
   }, [dupes, fwcDupes, ccDupes]);
 
-  function toggleOwned(code, idx) {
+  function toggleOwned(code, idx, label) {
     setOwned(prev => {
-      const arr = [...prev[code]]; arr[idx] = !arr[idx];
-      if (!arr[idx]) setDupes(pd => { const da = [...pd[code]]; da[idx] = 0; return { ...pd, [code]: da }; });
+      const arr = [...prev[code]]; 
+      const wasOwned = arr[idx];
+      arr[idx] = !arr[idx];
+      if (!arr[idx]) {
+        setDupes(pd => { const da = [...pd[code]]; da[idx] = 0; return { ...pd, [code]: da }; });
+        showToast(`✕ Removed ${label}`, "remove");
+      } else {
+        showToast(`✓ Added ${label}`, "success");
+      }
       return { ...prev, [code]: arr };
     });
   }
-  function changeDupe(code, idx, delta) {
-    setDupes(prev => { const arr = [...prev[code]]; arr[idx] = Math.max(0, (arr[idx]||0)+delta); return { ...prev, [code]: arr }; });
+  function changeDupe(code, idx, delta, label) {
+    setDupes(prev => {
+      const arr = [...prev[code]];
+      const newVal = Math.max(0, (arr[idx]||0)+delta);
+      arr[idx] = newVal;
+      if (delta > 0) showToast(`+ Duplicate added for ${label} (×${newVal})`, "dupe");
+      else if (delta < 0 && newVal >= 0) showToast(`− Duplicate removed for ${label} (×${newVal})`, "remove");
+      return { ...prev, [code]: arr };
+    });
   }
   function teamOwned(code) { return (owned[code]||[]).filter(Boolean).length; }
   function teamTotal(code) { return (owned[code]||[]).length; }
@@ -343,7 +365,7 @@ export default function App() {
             return (
               <div key={sticker.key}>
                 <div style={{ position: "relative" }}>
-                  <button onClick={() => { if (!isOwned) toggleOwned(code, i); }} style={{
+                  <button onClick={() => { if (!isOwned) toggleOwned(code, i, sticker.label); }} style={{
                     width: "100%", aspectRatio: "3/4", borderRadius: 6, cursor: isOwned ? "default" : "pointer", padding: 0,
                     border: isOwned ? `2px solid ${T.green}` : `1px solid ${T.border}`,
                     background: isOwned ? "rgba(0,193,138,0.15)" : T.navy,
@@ -354,7 +376,7 @@ export default function App() {
                   </button>
                   {isOwned && (
                     <button
-                      onClick={() => toggleOwned(code, i)}
+                      onClick={() => toggleOwned(code, i, sticker.label)}
                       title="Click to unmark"
                       style={{
                         position: "absolute", top: 2, right: 2,
@@ -369,9 +391,9 @@ export default function App() {
                 </div>
                 {isOwned && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, marginTop: 3 }}>
-                    <button onClick={() => changeDupe(code, i, -1)} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>−</button>
+                    <button onClick={() => changeDupe(code, i, -1, sticker.label)} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>−</button>
                     <span style={{ fontSize:9,minWidth:12,textAlign:"center",color:dupeCount>0?T.green:T.muted }}>{dupeCount}</span>
-                    <button onClick={() => changeDupe(code, i, 1)} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>+</button>
+                    <button onClick={() => changeDupe(code, i, 1, sticker.label)} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>+</button>
                   </div>
                 )}
               </div>
@@ -412,6 +434,7 @@ export default function App() {
                   <button onClick={() => {
                     if (!isOwned) {
                       const arr = [...ownedArr]; arr[i] = true; setOwnedArr(arr);
+                      showToast(`✓ Added ${sticker.label}`, "success");
                     }
                   }} style={{
                     width: "100%", aspectRatio: "3/4", borderRadius: 6, cursor: isOwned ? "default" : "pointer", padding: 0,
@@ -428,6 +451,7 @@ export default function App() {
                         const arr = [...ownedArr]; arr[i] = false;
                         const da = [...dupesArr]; da[i] = 0;
                         setOwnedArr(arr); setDupesArr(da);
+                        showToast(`✕ Removed ${sticker.label}`, "remove");
                       }}
                       title="Click to unmark"
                       style={{
@@ -443,9 +467,9 @@ export default function App() {
                 </div>
                 {isOwned && (
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, marginTop: 3 }}>
-                    <button onClick={() => { const da=[...dupesArr]; da[i]=Math.max(0,(da[i]||0)-1); setDupesArr(da); }} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>−</button>
+                    <button onClick={() => { const da=[...dupesArr]; const nv=Math.max(0,(da[i]||0)-1); da[i]=nv; setDupesArr(da); showToast(`− Duplicate removed for ${sticker.label} (×${nv})`, "remove"); }} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>−</button>
                     <span style={{ fontSize:9,minWidth:12,textAlign:"center",color:dupeCount>0?color:T.muted }}>{dupeCount}</span>
-                    <button onClick={() => { const da=[...dupesArr]; da[i]=(da[i]||0)+1; setDupesArr(da); }} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>+</button>
+                    <button onClick={() => { const da=[...dupesArr]; const nv=(da[i]||0)+1; da[i]=nv; setDupesArr(da); showToast(`+ Duplicate added for ${sticker.label} (×${nv})`, "dupe"); }} style={{ width:15,height:15,borderRadius:"50%",border:`1px solid ${T.border}`,background:T.navyLight,cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",color:T.muted,padding:0 }}>+</button>
                   </div>
                 )}
               </div>
@@ -709,6 +733,22 @@ export default function App() {
   return (
     <>
       <style>{css}</style>
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+          zIndex: 9999, whiteSpace: "nowrap",
+          background: toast.type === "success" ? T.green : toast.type === "dupe" ? T.gold : T.red,
+          color: toast.type === "dupe" ? T.navy : T.white,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+          animation: "slideUp 0.2s ease",
+        }}>
+          {toast.message}
+        </div>
+      )}
+      <style>{`@keyframes slideUp { from { opacity:0; transform:translateX(-50%) translateY(10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`}</style>
+
       <div style={{ fontFamily: "Inter, sans-serif", background: T.navy, minHeight: "100vh", padding: "1.25rem 1rem", maxWidth: 700, margin: "0 auto" }}>
 
         {/* Header */}
