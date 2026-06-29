@@ -585,6 +585,217 @@ export default function App() {
 
   const isSearching = search.trim().length > 0;
 
+  // ── Trade View ─────────────────────────────────────────────────────────────
+  const TradeView = () => {
+    const [addInput, setAddInput] = useState("");
+    const [removeInput, setRemoveInput] = useState("");
+    const [addResults, setAddResults] = useState(null);
+    const [removeResults, setRemoveResults] = useState(null);
+
+    const allStickers = useMemo(() => {
+      const map = {};
+      ALL_TEAMS.forEach(team => {
+        buildStickers(team).forEach((s, i) => {
+          map[s.label.toUpperCase()] = { code: team.code, teamName: team.name, idx: i, label: s.label };
+        });
+      });
+      FWC_STICKERS.forEach((s, i) => { map[s.label.toUpperCase()] = { code: "FWC", teamName: "FWC Stickers", idx: i, label: s.label, isFWC: true }; });
+      CC_STICKERS.forEach((s, i)  => { map[s.label.toUpperCase()] = { code: "CC",  teamName: "CC Stickers",  idx: i, label: s.label, isCC:  true }; });
+      return map;
+    }, []);
+
+    function parseCodes(text) {
+      return [...new Set((text.toUpperCase().match(/[A-Z]{2,4}\d{1,2}/g) || []))];
+    }
+
+    // BULK ADD — mark stickers as owned
+    function handleBulkAdd() {
+      const codes = parseCodes(addInput);
+      const added = [], alreadyHad = [], notFound = [];
+      codes.forEach(code => {
+        const sticker = allStickers[code];
+        if (!sticker) { notFound.push(code); return; }
+        if (sticker.isFWC) {
+          if (fwcOwned[sticker.idx]) { alreadyHad.push(sticker); return; }
+          const arr = [...fwcOwned]; arr[sticker.idx] = true; setFwcOwned(arr);
+        } else if (sticker.isCC) {
+          if (ccOwned[sticker.idx]) { alreadyHad.push(sticker); return; }
+          const arr = [...ccOwned]; arr[sticker.idx] = true; setCcOwned(arr);
+        } else {
+          if (owned[sticker.code]?.[sticker.idx]) { alreadyHad.push(sticker); return; }
+          setOwned(prev => { const arr = [...prev[sticker.code]]; arr[sticker.idx] = true; return { ...prev, [sticker.code]: arr }; });
+        }
+        added.push(sticker);
+        showToast(`✓ Added ${sticker.label}`, "success");
+      });
+      setAddResults({ added, alreadyHad, notFound });
+    }
+
+    // BULK REMOVE — only removes 1 duplicate if available, otherwise unmarks
+    function handleBulkRemove() {
+      const codes = parseCodes(removeInput);
+      const traded = [], removedDupe = [], notOwned = [], notFound = [];
+      codes.forEach(code => {
+        const sticker = allStickers[code];
+        if (!sticker) { notFound.push(code); return; }
+
+        if (sticker.isFWC) {
+          if (!fwcOwned[sticker.idx]) { notOwned.push(sticker); return; }
+          const dupeCount = fwcDupes[sticker.idx] || 0;
+          if (dupeCount > 0) {
+            const da = [...fwcDupes]; da[sticker.idx] = dupeCount - 1; setFwcDupes(da);
+            removedDupe.push({ ...sticker, wasCount: dupeCount, newCount: dupeCount - 1 });
+            showToast(`− Traded away duplicate ${sticker.label} (×${dupeCount - 1} left)`, "remove");
+          } else {
+            const arr = [...fwcOwned]; arr[sticker.idx] = false; setFwcOwned(arr);
+            traded.push(sticker);
+            showToast(`✕ Traded away ${sticker.label}`, "remove");
+          }
+        } else if (sticker.isCC) {
+          if (!ccOwned[sticker.idx]) { notOwned.push(sticker); return; }
+          const dupeCount = ccDupes[sticker.idx] || 0;
+          if (dupeCount > 0) {
+            const da = [...ccDupes]; da[sticker.idx] = dupeCount - 1; setCcDupes(da);
+            removedDupe.push({ ...sticker, wasCount: dupeCount, newCount: dupeCount - 1 });
+            showToast(`− Traded away duplicate ${sticker.label} (×${dupeCount - 1} left)`, "remove");
+          } else {
+            const arr = [...ccOwned]; arr[sticker.idx] = false; setCcOwned(arr);
+            traded.push(sticker);
+            showToast(`✕ Traded away ${sticker.label}`, "remove");
+          }
+        } else {
+          if (!owned[sticker.code]?.[sticker.idx]) { notOwned.push(sticker); return; }
+          const dupeCount = dupes[sticker.code]?.[sticker.idx] || 0;
+          if (dupeCount > 0) {
+            setDupes(prev => { const arr = [...prev[sticker.code]]; arr[sticker.idx] = dupeCount - 1; return { ...prev, [sticker.code]: arr }; });
+            removedDupe.push({ ...sticker, wasCount: dupeCount, newCount: dupeCount - 1 });
+            showToast(`− Traded away duplicate ${sticker.label} (×${dupeCount - 1} left)`, "remove");
+          } else {
+            setOwned(prev => { const arr = [...prev[sticker.code]]; arr[sticker.idx] = false; return { ...prev, [sticker.code]: arr }; });
+            setDupes(prev => { const arr = [...prev[sticker.code]]; arr[sticker.idx] = 0; return { ...prev, [sticker.code]: arr }; });
+            traded.push(sticker);
+            showToast(`✕ Traded away ${sticker.label}`, "remove");
+          }
+        }
+      });
+      setRemoveResults({ traded, removedDupe, notOwned, notFound });
+    }
+
+    const sectionStyle = { background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: "14px 16px" };
+    const pillStyle = (bg, border, color) => ({ padding: "4px 10px", borderRadius: 5, background: bg, border: `1px solid ${border}`, display: "inline-flex", flexDirection: "column" });
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+        {/* BULK ADD */}
+        <div style={sectionStyle}>
+          <div style={{ fontFamily: "Bebas Neue, sans-serif", fontSize: 18, color: T.green, letterSpacing: "0.08em", marginBottom: 4 }}>📥 STICKERS I RECEIVED</div>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>Paste sticker codes you got from a trade — they'll be marked as owned.</div>
+          <textarea value={addInput} onChange={e => setAddInput(e.target.value)}
+            placeholder="e.g. MEX1, BRA3, FWC2, CC1..."
+            style={{ width: "100%", height: 100, fontSize: 12, fontFamily: "monospace", padding: 10, borderRadius: 6, border: `1px solid ${T.border}`, background: T.navy, color: T.white, resize: "vertical", outline: "none", marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleBulkAdd} style={{ flex: 1, padding: "10px", fontSize: 13, fontWeight: 700, borderRadius: 6, cursor: "pointer", border: "none", background: T.green, color: T.navy }}>✓ ADD STICKERS</button>
+            <button onClick={() => { setAddInput(""); setAddResults(null); }} style={{ padding: "10px 14px", fontSize: 12, borderRadius: 6, cursor: "pointer", border: `1px solid ${T.border}`, background: T.navyLight, color: T.muted }}>Clear</button>
+          </div>
+          {addResults && (
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              {addResults.added.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.green, marginBottom: 6 }}>✓ Added {addResults.added.length} sticker{addResults.added.length !== 1 ? "s" : ""}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {addResults.added.map(s => (
+                      <div key={s.label} style={pillStyle("rgba(0,193,138,0.12)", T.greenDim, T.green)}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: T.green }}>{s.label}</span>
+                        <span style={{ fontSize: 9, color: T.muted }}>{s.teamName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {addResults.alreadyHad.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.gold, marginBottom: 6 }}>⚠ Already owned ({addResults.alreadyHad.length}) — not changed</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {addResults.alreadyHad.map(s => (
+                      <div key={s.label} style={pillStyle("rgba(245,197,24,0.1)", T.goldDim, T.gold)}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: T.gold }}>{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {addResults.notFound.length > 0 && (
+                <div style={{ fontSize: 12, color: T.muted }}>? Not recognized: {addResults.notFound.join(", ")}</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* BULK REMOVE */}
+        <div style={sectionStyle}>
+          <div style={{ fontFamily: "Bebas Neue, sans-serif", fontSize: 18, color: T.red, letterSpacing: "0.08em", marginBottom: 4 }}>📤 STICKERS I TRADED AWAY</div>
+          <div style={{ fontSize: 12, color: T.muted, marginBottom: 10 }}>
+            Paste sticker codes you gave away. If you have duplicates, <strong style={{ color: T.white }}>only 1 duplicate is removed</strong>. If you have no duplicates, the sticker is unmarked.
+          </div>
+          <textarea value={removeInput} onChange={e => setRemoveInput(e.target.value)}
+            placeholder="e.g. MEX3, BRA7, FWC5..."
+            style={{ width: "100%", height: 100, fontSize: 12, fontFamily: "monospace", padding: 10, borderRadius: 6, border: `1px solid ${T.border}`, background: T.navy, color: T.white, resize: "vertical", outline: "none", marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleBulkRemove} style={{ flex: 1, padding: "10px", fontSize: 13, fontWeight: 700, borderRadius: 6, cursor: "pointer", border: "none", background: T.red, color: T.white }}>✕ REMOVE STICKERS</button>
+            <button onClick={() => { setRemoveInput(""); setRemoveResults(null); }} style={{ padding: "10px 14px", fontSize: 12, borderRadius: 6, cursor: "pointer", border: `1px solid ${T.border}`, background: T.navyLight, color: T.muted }}>Clear</button>
+          </div>
+          {removeResults && (
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              {removeResults.removedDupe.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.gold, marginBottom: 6 }}>− Removed 1 duplicate ({removeResults.removedDupe.length} sticker{removeResults.removedDupe.length !== 1 ? "s" : ""})</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {removeResults.removedDupe.map(s => (
+                      <div key={s.label} style={pillStyle("rgba(245,197,24,0.1)", T.goldDim, T.gold)}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: T.gold }}>{s.label}</span>
+                        <span style={{ fontSize: 9, color: T.muted }}>×{s.wasCount} → ×{s.newCount}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {removeResults.traded.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#FF6680", marginBottom: 6 }}>✕ Fully traded away ({removeResults.traded.length} sticker{removeResults.traded.length !== 1 ? "s" : ""})</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {removeResults.traded.map(s => (
+                      <div key={s.label} style={pillStyle("rgba(200,16,46,0.15)", "#8B1020", "#FF6680")}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#FF6680" }}>{s.label}</span>
+                        <span style={{ fontSize: 9, color: T.muted }}>{s.teamName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {removeResults.notOwned.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.muted, marginBottom: 6 }}>⚠ Didn't have these — skipped</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {removeResults.notOwned.map(s => (
+                      <div key={s.label} style={pillStyle(T.navyLight, T.border, T.muted)}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: T.muted }}>{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {removeResults.notFound.length > 0 && (
+                <div style={{ fontSize: 12, color: T.muted }}>? Not recognized: {removeResults.notFound.join(", ")}</div>
+              )}
+            </div>
+          )}
+        </div>
+
+      </div>
+    );
+  };
+
   // ── Check List View ────────────────────────────────────────────────────────
   const CheckListView = () => {
     const [input, setInput] = useState("");
@@ -870,6 +1081,7 @@ export default function App() {
                 { key:"team",      label:"By Team" },
                 { key:"missing",   label:`Missing${TOTAL_STICKERS-totalOwned>0?` (${TOTAL_STICKERS-totalOwned})`:""}` },
                 { key:"dupes",     label:`Dupes${totalDupes>0?` (${totalDupes})`:""}` },
+                { key:"trade",     label:"🔄 Trade" },
                 { key:"checklist", label:"📋 Check List" },
               ].map(({key,label})=>(
                 <TabBtn key={key} active={view===key} onClick={()=>{setView(key);setOpenTeam(null);}}>{label}</TabBtn>
@@ -937,6 +1149,7 @@ export default function App() {
 
             {view==="missing" && <MissingView />}
             {view==="dupes"   && <DupesView />}
+            {view==="trade"   && <TradeView />}
             {view==="checklist" && <CheckListView />}
           </>
         )}
