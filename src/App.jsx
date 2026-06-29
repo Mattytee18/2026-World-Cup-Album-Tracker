@@ -612,22 +612,40 @@ export default function App() {
     function handleBulkAdd() {
       const codes = parseCodes(addInput);
       const added = [], alreadyHad = [], notFound = [];
+
+      // Collect all changes first
+      const teamChanges = {};
+      const fwcChanges = [...fwcOwned];
+      const ccChanges = [...ccOwned];
+
       codes.forEach(code => {
         const sticker = allStickers[code];
         if (!sticker) { notFound.push(code); return; }
+
         if (sticker.isFWC) {
-          if (fwcOwned[sticker.idx]) { alreadyHad.push(sticker); return; }
-          const arr = [...fwcOwned]; arr[sticker.idx] = true; setFwcOwned(arr);
+          if (fwcChanges[sticker.idx]) { alreadyHad.push(sticker); return; }
+          fwcChanges[sticker.idx] = true;
+          added.push(sticker);
         } else if (sticker.isCC) {
-          if (ccOwned[sticker.idx]) { alreadyHad.push(sticker); return; }
-          const arr = [...ccOwned]; arr[sticker.idx] = true; setCcOwned(arr);
+          if (ccChanges[sticker.idx]) { alreadyHad.push(sticker); return; }
+          ccChanges[sticker.idx] = true;
+          added.push(sticker);
         } else {
-          if (owned[sticker.code]?.[sticker.idx]) { alreadyHad.push(sticker); return; }
-          setOwned(prev => { const arr = [...prev[sticker.code]]; arr[sticker.idx] = true; return { ...prev, [sticker.code]: arr }; });
+          if (!teamChanges[sticker.code]) teamChanges[sticker.code] = [...(owned[sticker.code] || [])];
+          if (teamChanges[sticker.code][sticker.idx]) { alreadyHad.push(sticker); return; }
+          teamChanges[sticker.code][sticker.idx] = true;
+          added.push(sticker);
         }
-        added.push(sticker);
-        showToast(`✓ Added ${sticker.label}`, "success");
       });
+
+      // Apply all changes at once
+      if (Object.keys(teamChanges).length > 0) {
+        setOwned(prev => ({ ...prev, ...teamChanges }));
+      }
+      setFwcOwned(fwcChanges);
+      setCcOwned(ccChanges);
+
+      if (added.length > 0) showToast(`✓ Added ${added.length} sticker${added.length !== 1 ? "s" : ""}`, "success");
       setAddResults({ added, alreadyHad, notFound });
     }
 
@@ -635,49 +653,65 @@ export default function App() {
     function handleBulkRemove() {
       const codes = parseCodes(removeInput);
       const traded = [], removedDupe = [], notOwned = [], notFound = [];
+
+      // Collect all changes first
+      const teamOwnedChanges = {};
+      const teamDupesChanges = {};
+      const fwcOwnedChanges = [...fwcOwned];
+      const fwcDupesChanges = [...fwcDupes];
+      const ccOwnedChanges = [...ccOwned];
+      const ccDupesChanges = [...ccDupes];
+
       codes.forEach(code => {
         const sticker = allStickers[code];
         if (!sticker) { notFound.push(code); return; }
 
         if (sticker.isFWC) {
-          if (!fwcOwned[sticker.idx]) { notOwned.push(sticker); return; }
-          const dupeCount = fwcDupes[sticker.idx] || 0;
+          if (!fwcOwnedChanges[sticker.idx]) { notOwned.push(sticker); return; }
+          const dupeCount = fwcDupesChanges[sticker.idx] || 0;
           if (dupeCount > 0) {
-            const da = [...fwcDupes]; da[sticker.idx] = dupeCount - 1; setFwcDupes(da);
+            fwcDupesChanges[sticker.idx] = dupeCount - 1;
             removedDupe.push({ ...sticker, wasCount: dupeCount, newCount: dupeCount - 1 });
-            showToast(`− Traded away duplicate ${sticker.label} (×${dupeCount - 1} left)`, "remove");
           } else {
-            const arr = [...fwcOwned]; arr[sticker.idx] = false; setFwcOwned(arr);
+            fwcOwnedChanges[sticker.idx] = false;
             traded.push(sticker);
-            showToast(`✕ Traded away ${sticker.label}`, "remove");
           }
         } else if (sticker.isCC) {
-          if (!ccOwned[sticker.idx]) { notOwned.push(sticker); return; }
-          const dupeCount = ccDupes[sticker.idx] || 0;
+          if (!ccOwnedChanges[sticker.idx]) { notOwned.push(sticker); return; }
+          const dupeCount = ccDupesChanges[sticker.idx] || 0;
           if (dupeCount > 0) {
-            const da = [...ccDupes]; da[sticker.idx] = dupeCount - 1; setCcDupes(da);
+            ccDupesChanges[sticker.idx] = dupeCount - 1;
             removedDupe.push({ ...sticker, wasCount: dupeCount, newCount: dupeCount - 1 });
-            showToast(`− Traded away duplicate ${sticker.label} (×${dupeCount - 1} left)`, "remove");
           } else {
-            const arr = [...ccOwned]; arr[sticker.idx] = false; setCcOwned(arr);
+            ccOwnedChanges[sticker.idx] = false;
             traded.push(sticker);
-            showToast(`✕ Traded away ${sticker.label}`, "remove");
           }
         } else {
-          if (!owned[sticker.code]?.[sticker.idx]) { notOwned.push(sticker); return; }
-          const dupeCount = dupes[sticker.code]?.[sticker.idx] || 0;
+          if (!teamOwnedChanges[sticker.code]) teamOwnedChanges[sticker.code] = [...(owned[sticker.code] || [])];
+          if (!teamDupesChanges[sticker.code]) teamDupesChanges[sticker.code] = [...(dupes[sticker.code] || [])];
+          if (!teamOwnedChanges[sticker.code][sticker.idx]) { notOwned.push(sticker); return; }
+          const dupeCount = teamDupesChanges[sticker.code][sticker.idx] || 0;
           if (dupeCount > 0) {
-            setDupes(prev => { const arr = [...prev[sticker.code]]; arr[sticker.idx] = dupeCount - 1; return { ...prev, [sticker.code]: arr }; });
+            teamDupesChanges[sticker.code][sticker.idx] = dupeCount - 1;
             removedDupe.push({ ...sticker, wasCount: dupeCount, newCount: dupeCount - 1 });
-            showToast(`− Traded away duplicate ${sticker.label} (×${dupeCount - 1} left)`, "remove");
           } else {
-            setOwned(prev => { const arr = [...prev[sticker.code]]; arr[sticker.idx] = false; return { ...prev, [sticker.code]: arr }; });
-            setDupes(prev => { const arr = [...prev[sticker.code]]; arr[sticker.idx] = 0; return { ...prev, [sticker.code]: arr }; });
+            teamOwnedChanges[sticker.code][sticker.idx] = false;
+            teamDupesChanges[sticker.code][sticker.idx] = 0;
             traded.push(sticker);
-            showToast(`✕ Traded away ${sticker.label}`, "remove");
           }
         }
       });
+
+      // Apply all changes at once
+      if (Object.keys(teamOwnedChanges).length > 0) setOwned(prev => ({ ...prev, ...teamOwnedChanges }));
+      if (Object.keys(teamDupesChanges).length > 0) setDupes(prev => ({ ...prev, ...teamDupesChanges }));
+      setFwcOwned(fwcOwnedChanges);
+      setFwcDupes(fwcDupesChanges);
+      setCcOwned(ccOwnedChanges);
+      setCcDupes(ccDupesChanges);
+
+      const total = traded.length + removedDupe.length;
+      if (total > 0) showToast(`✕ Removed ${total} sticker${total !== 1 ? "s" : ""}`, "remove");
       setRemoveResults({ traded, removedDupe, notOwned, notFound });
     }
 
