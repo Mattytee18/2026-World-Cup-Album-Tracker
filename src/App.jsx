@@ -927,7 +927,25 @@ export default function App() {
             {/* Stickers you need */}
             {results.need.length > 0 && (
               <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#FF6680", marginBottom: 10 }}>✗ You need these ({results.need.length})</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#FF6680" }}>✗ You need these ({results.need.length})</div>
+                  <CopyButton
+                    label="📋 Copy needed"
+                    getText={() => {
+                      const byTeam = {};
+                      results.need.forEach(s => {
+                        if (!byTeam[s.teamName]) byTeam[s.teamName] = [];
+                        byTeam[s.teamName].push(s.label);
+                      });
+                      const lines = ["STICKERS I NEED FROM THIS LIST", ""];
+                      Object.entries(byTeam).forEach(([team, items]) => {
+                        lines.push(`${team}: ${items.join(", ")}`);
+                      });
+                      lines.push("", `Total needed: ${results.need.length}`);
+                      return lines.join("\n");
+                    }}
+                  />
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                   {results.need.map(({ label, teamName, isFWC, isCC }) => (
                     <div key={label} style={{ padding: "4px 10px", borderRadius: 5, background: "rgba(200,16,46,0.15)", border: "1px solid #8B1020" }}>
